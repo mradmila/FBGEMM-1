@@ -47,10 +47,7 @@ prepare_fbgemm_gpu_build () {
   # shellcheck disable=SC2086
   (exec_with_retries 3 conda run --no-capture-output ${env_prefix} python -m pip install -r requirements.txt) || return 1
 
-  # BUILD_VARIANT is provided by the github workflow file
-  if [ "$BUILD_VARIANT" == "cuda" ] || [ "$BUILD_VARIANT" == "genai" ]; then
-    (install_triton_pip "${env_name}") || return 1
-  fi
+  (install_triton_pip "${env_name}") || return 1
 
   # shellcheck disable=SC2086
   (test_python_import_package "${env_name}" numpy) || return 1
@@ -311,7 +308,7 @@ __build_fbgemm_gpu_set_python_tag () {
   # shellcheck disable=SC2206
   local python_version_arr=(${python_version[1]//./ })
 
-  # Set the python tag (e.g. Python 3.12 --> py312)
+  # Set the python tag (e.g. Python 3.13 --> py313)
   export python_tag="py${python_version_arr[0]}${python_version_arr[1]}"
   echo "[BUILD] Extracted and set Python tag: ${python_tag}"
 }
@@ -411,18 +408,22 @@ __print_library_infos () {
     echo "[CHECK] Listing out library size:"
     print_exec "du -h --block-size=1M ${library}"
 
-    echo "[CHECK] Listing out the GLIBCXX versions referenced:"
     print_glibc_info "${library}"
 
-    echo "[CHECK] Checking symbols: "
-    print_exec "nm -gDC ${library} > symbols"
-    echo "[CHECK] Number of symbols in ${library}: $(wc -l < symbols)"
-    echo "[CHECK] Number of fbgemm symbols: $(grep -c fbgemm symbols)"
+    # shellcheck disable=SC2155
+    local symbols_file=$(mktemp --suffix ".symbols.txt")
+    print_exec "nm -gDC ${library} > ${symbols_file}"
+    # shellcheck disable=SC2086
+    echo "[CHECK] Total Number of symbols: $(wc -l ${symbols_file} | awk '{print $1}')"
+    # shellcheck disable=SC2086
+    echo "[CHECK] Number of fbgemm symbols: $(grep -c fbgemm ${symbols_file})"
 
-    print_exec "nm -gDCu ${library} > usymbols"
-    echo "[CHECK] Number of undefined symbols: $(wc -l < usymbols)"
-    echo "[CHECK] Listing out undefined symbols:"
-    print_exec "sort usymbols"
+    # shellcheck disable=SC2155
+    local usymbols_file=$(mktemp --suffix ".usymbols.txt")
+    print_exec "nm -gDCu ${library} > ${usymbols_file}"
+    # shellcheck disable=SC2086
+    echo "[CHECK] Listing out undefined symbols ($(wc -l ${usymbols_file} | awk '{print $1}') total):"
+    cat "${usymbols_file}" | sort
 
     echo "[CHECK] Listing out external shared libraries linked:"
     print_exec ldd "${library}"

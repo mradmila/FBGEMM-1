@@ -40,7 +40,6 @@ function(LIST_FILTER)
   set(${args_OUTPUT} ${${args_OUTPUT}} PARENT_SCOPE)
 endfunction()
 
-
 function(prepend_filepaths)
   set(flags)
   set(singleValueArgs PREFIX OUTPUT)
@@ -59,6 +58,19 @@ function(prepend_filepaths)
 
   set(${args_OUTPUT} ${${args_OUTPUT}} PARENT_SCOPE)
 endfunction()
+
+macro(handle_genfiles variable)
+  prepend_filepaths(
+    PREFIX ${CMAKE_BINARY_DIR}
+    INPUT ${${variable}}
+    OUTPUT ${variable})
+endmacro()
+
+macro(handle_genfiles_rocm variable)
+  if(USE_ROCM)
+    handle_genfiles(${variable})
+  endif()
+endmacro()
 
 function(add_to_package)
   set(flags)
